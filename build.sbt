@@ -32,5 +32,11 @@ lazy val java = project
   .settings(stdSettings("zio-interop-java"))
   .settings(buildInfoSettings)
   .settings(
-    libraryDependencies += "dev.zio" %% "zio" % "1.0.0-RC8-12"
+    libraryDependencies ++= Seq(
+      "dev.zio"     %% "zio"                  % "1.0.0-RC8-12",
+      "com.twitter" %% "util-core"            % "19.5.1",
+      "dev.zio"     %% "zio"                  % "1.0.0-RC8-12" % Test classifier "tests",
+      "org.specs2"  %% "specs2-core"          % "4.5.1" % Test,
+      "org.specs2"  %% "specs2-matcher-extra" % "4.5.1" % Test
+    )
   )
