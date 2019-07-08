@@ -4,7 +4,7 @@ package interop
 import java.util.concurrent.{ CompletableFuture, CompletionStage, Future }
 
 import org.specs2.concurrent.ExecutionEnv
-import zio.Exit.Cause.{ die, fail }
+import zio.Cause.{ die, fail }
 import zio.interop.javaconcurrent._
 
 class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
