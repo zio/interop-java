@@ -46,7 +46,7 @@ object javaconcurrent {
       csIo.flatMap(unsafeCompletionStageToIO)
 
     def fromCompletionStage[A](cs: () => CompletionStage[A]): Task[A] =
-      IO.suspend {
+      IO.effectSuspendTotal {
         unsafeCompletionStageToIO(cs())
       }
 
@@ -79,7 +79,7 @@ object javaconcurrent {
       futureIo.flatMap(unsafeFutureJavaToIO)
 
     def fromFutureJava[A](future: () => Future[A]): Task[A] =
-      IO.suspend {
+      IO.effectSuspendTotal {
         unsafeFutureJavaToIO(future())
       }
   }
@@ -96,7 +96,7 @@ object javaconcurrent {
           Task.fromFutureJava(() => ftr).fold(Exit.fail, Exit.succeed)
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
-          IO.suspend {
+          IO.effectSuspendTotal {
             if (ftr.isDone) {
               IO.effect(ftr.get())
                 .refineToOrDie[Exception]
