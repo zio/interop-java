@@ -16,94 +16,152 @@
 
 package zio.interop
 
+import java.nio.channels.CompletionHandler
 import java.util.concurrent.{ CompletableFuture, CompletionException, CompletionStage, Future }
 
 import zio._
 import zio.blocking.{ blocking, Blocking }
 
 import scala.concurrent.ExecutionException
+import scala.util.control.NonFatal
 
 object javaconcurrent {
 
-  implicit class IOObjJavaconcurrentOps(private val taskObj: Task.type) extends AnyVal {
+  def withCompletionHandler[T](op: CompletionHandler[T, Unit] => Unit): Task[T] =
+    Task.effectAsync[T] { k =>
+      val handler = new CompletionHandler[T, Unit] {
+        def completed(result: T, u: Unit): Unit =
+          k(Task.succeed(result))
 
-    private def unsafeCompletionStageToIO[A](cs: CompletionStage[A]): Task[A] =
-      IO.effectAsync { cb =>
+        def failed(t: Throwable, u: Unit): Unit =
+          t match {
+            case NonFatal(e) => k(Task.fail(e))
+            case _           => k(Task.die(t))
+          }
+      }
+
+      try {
+        op(handler)
+      } catch {
+        case NonFatal(e) => k(Task.fail(e))
+      }
+    }
+
+  def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
+    csUio.flatMap { cs =>
+      Task.effectAsync { cb =>
         val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
           val io = t match {
             case null =>
-              IO.succeed(v)
+              Task.succeed(v)
             case e: CompletionException =>
-              IO.fail(e.getCause)
-            case t: Throwable =>
-              IO.fail(t)
+              Task.fail(e.getCause)
+            case NonFatal(e) =>
+              Task.fail(e)
+            case _ =>
+              Task.die(t)
           }
           cb(io)
         }
       }
+    }
 
-    def fromCompletionStage[A, E >: Throwable](csIo: IO[E, CompletionStage[A]]): IO[E, A] =
-      csIo.flatMap(unsafeCompletionStageToIO)
-
-    def fromCompletionStage[A](cs: () => CompletionStage[A]): Task[A] =
-      IO.effectSuspendTotal {
-        unsafeCompletionStageToIO(cs())
-      }
-
-    private def unsafeFutureJavaToIO[A](future: Future[A]): Task[A] = {
+  /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
+  def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
+    futureUio.flatMap { future =>
       def unwrap[B](f: Future[B]): Task[B] =
-        IO.flatten {
-          IO.effectTotal {
+        Task.flatten {
+          Task.effect {
             try {
               val result = f.get()
-              IO.succeed(result)
+              Task.succeed(result)
             } catch {
               case e: ExecutionException =>
-                IO.fail(e.getCause)
+                Task.fail(e.getCause)
               case _: InterruptedException =>
-                IO.interrupt
-              case t: Throwable => // CancellationException
-                IO.fail(t)
+                Task.interrupt
             }
           }
         }
 
-      if (future.isDone) {
-        unwrap(future)
-      } else {
-        blocking(unwrap(future)).provide(Blocking.Live)
-      }
+      for {
+        isDone <- Task.effect(future.isDone)
+        result <- if (isDone) {
+                   unwrap(future)
+                 } else {
+                   blocking(unwrap(future)).provide(Blocking.Live)
+                 }
+      } yield result
     }
 
-    def fromFutureJava[A, E >: Throwable](futureIo: IO[E, Future[A]]): IO[E, A] =
-      futureIo.flatMap(unsafeFutureJavaToIO)
+  implicit class CompletionStageJavaconcurrentOps[A](private val csUio: UIO[CompletionStage[A]]) extends AnyVal {
+    def toZio: Task[A] = Task.fromCompletionStage(csUio)
+  }
 
-    def fromFutureJava[A](future: () => Future[A]): Task[A] =
-      IO.effectSuspendTotal {
-        unsafeFutureJavaToIO(future())
-      }
+  implicit class FutureJavaconcurrentOps[A](private val futureUio: UIO[Future[A]]) extends AnyVal {
+
+    /** WARNING: this uses the blocking Future#get, consider using `CompletionStage` */
+    def toZio: Task[A] = Task.fromFutureJava(futureUio)
+  }
+
+  implicit class TaskObjJavaconcurrentOps(private val taskObj: Task.type) extends AnyVal {
+
+    def withCompletionHandler[T](op: CompletionHandler[T, Unit] => Unit): Task[T] =
+      javaconcurrent.withCompletionHandler(op)
+
+    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaconcurrent.fromCompletionStage(csUio)
+
+    /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
+    def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] = javaconcurrent.fromFutureJava(futureUio)
+
   }
 
   implicit class FiberObjOps(private val fiberObj: Fiber.type) extends AnyVal {
 
-    def fromFutureJava[A](_ftr: () => Future[A]): Fiber[Throwable, A] = {
+    def fromCompletionStage[A](thunk: => CompletionStage[A]): Fiber[Throwable, A] = {
 
-      lazy val ftr = _ftr()
+      lazy val cf = thunk.toCompletableFuture
+
+      new Fiber[Throwable, A] {
+
+        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.succeedLazy(cf)).run
+
+        override def poll: UIO[Option[Exit[Throwable, A]]] =
+          UIO.effectSuspendTotal {
+            if (cf.isDone) {
+              Task
+                .fromCompletionStage(UIO.succeedLazy(cf))
+                .fold(Exit.fail, Exit.succeed)
+                .map(Some(_))
+            } else {
+              UIO.succeed(None)
+            }
+          }
+
+        override def interrupt: UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
+
+        override def inheritFiberRefs: UIO[Unit] = UIO.unit
+      }
+    }
+
+    def fromFutureJava[A](thunk: => Future[A]): Fiber[Throwable, A] = {
+
+      lazy val ftr = thunk
 
       new Fiber[Throwable, A] {
 
         def await: UIO[Exit[Throwable, A]] =
-          Task.fromFutureJava(() => ftr).fold(Exit.fail, Exit.succeed)
+          Task.fromFutureJava(UIO.succeedLazy(ftr)).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
-          IO.effectSuspendTotal {
+          UIO.effectSuspendTotal {
             if (ftr.isDone) {
-              IO.effect(ftr.get())
-                .refineToOrDie[Exception]
+              Task
+                .fromFutureJava(UIO.succeedLazy(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
-              IO.succeed(None)
+              UIO.succeed(None)
             }
           }
 
@@ -132,7 +190,7 @@ object javaconcurrent {
   }
 
   implicit class IOOps[E, A](private val io: IO[E, A]) extends AnyVal {
-    def toCompletableFutureE(f: E => Throwable): UIO[CompletableFuture[A]] =
+    def toCompletableFutureWith(f: E => Throwable): UIO[CompletableFuture[A]] =
       io.mapError(f).toCompletableFuture
   }
 
