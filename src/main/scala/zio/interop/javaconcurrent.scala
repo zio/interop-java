@@ -27,13 +27,13 @@ import scala.util.control.NonFatal
 
 object javaconcurrent {
 
-  def withCompletionHandler[T](op: CompletionHandler[T, Unit] => Unit): Task[T] =
+  def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
     Task.effectAsync[T] { k =>
-      val handler = new CompletionHandler[T, Unit] {
-        def completed(result: T, u: Unit): Unit =
+      val handler = new CompletionHandler[T, Any] {
+        def completed(result: T, u: Any): Unit =
           k(Task.succeed(result))
 
-        def failed(t: Throwable, u: Unit): Unit =
+        def failed(t: Throwable, u: Any): Unit =
           t match {
             case NonFatal(e) => k(Task.fail(e))
             case _           => k(Task.die(t))
@@ -106,7 +106,7 @@ object javaconcurrent {
 
   implicit class TaskObjJavaconcurrentOps(private val taskObj: Task.type) extends AnyVal {
 
-    def withCompletionHandler[T](op: CompletionHandler[T, Unit] => Unit): Task[T] =
+    def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
       javaconcurrent.withCompletionHandler(op)
 
     def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaconcurrent.fromCompletionStage(csUio)
