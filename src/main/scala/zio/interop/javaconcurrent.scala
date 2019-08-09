@@ -124,13 +124,13 @@ object javaconcurrent {
 
       new Fiber[Throwable, A] {
 
-        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.succeedLazy(cf)).run
+        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.succeed(cf)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
             if (cf.isDone) {
               Task
-                .fromCompletionStage(UIO.succeedLazy(cf))
+                .fromCompletionStage(UIO.succeed(cf))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
@@ -151,13 +151,13 @@ object javaconcurrent {
       new Fiber[Throwable, A] {
 
         def await: UIO[Exit[Throwable, A]] =
-          Task.fromFutureJava(UIO.succeedLazy(ftr)).run
+          Task.fromFutureJava(UIO.succeed(ftr)).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
             if (ftr.isDone) {
               Task
-                .fromFutureJava(UIO.succeedLazy(ftr))
+                .fromFutureJava(UIO.succeed(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
