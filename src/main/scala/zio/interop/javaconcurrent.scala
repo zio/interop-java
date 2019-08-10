@@ -201,12 +201,12 @@ object javaconcurrent {
     }
   }
 
-  implicit class IOThrowableOps[A](private val io: Task[A]) extends AnyVal {
+  implicit class TaskCompletableFutureOps[A](private val io: Task[A]) extends AnyVal {
     def toCompletableFuture: UIO[CompletableFuture[A]] =
       io.fold(CompletableFuture_.failedFuture, CompletableFuture.completedFuture[A])
   }
 
-  implicit class IOOps[E, A](private val io: IO[E, A]) extends AnyVal {
+  implicit class IOCompletableFutureOps[E, A](private val io: IO[E, A]) extends AnyVal {
     def toCompletableFutureWith(f: E => Throwable): UIO[CompletableFuture[A]] =
       io.mapError(f).toCompletableFuture
   }
