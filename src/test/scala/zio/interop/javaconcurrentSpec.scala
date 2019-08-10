@@ -31,11 +31,16 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     return a `CompletableFuture` that produces the value from `IO`  $toCompletableFutureValue
   `Task.toCompletableFutureE` must
     convert error of type `E` to `Throwable`             $toCompletableFutureE
+  `Fiber.fromCompletionStage` must
+    be lazy on the `Future` parameter                    $lazyOnParamRefFiberCs
+    catch exceptions thrown by lazy block                $catchBlockExceptionFiberCs
+    return an `IO` that fails if `Future` fails          $propagateExceptionFromFutureFiberCs
+    return an `IO` that produces the value from `Future` $produceValueFromFutureFiberCs
   `Fiber.fromFutureJava` must
-    be lazy on the `Future` parameter                    $lazyOnParamRefFiber
-    catch exceptions thrown by lazy block                $catchBlockExceptionFiber
-    return an `IO` that fails if `Future` fails          $propagateExceptionFromFutureFiber
-    return an `IO` that produces the value from `Future` $produceValueFromFutureFiber
+    be lazy on the `Future` parameter                    $lazyOnParamRefFiberFuture
+    catch exceptions thrown by lazy block                $catchBlockExceptionFiberFuture
+    return an `IO` that fails if `Future` fails          $propagateExceptionFromFutureFiberFuture
+    return an `IO` that produces the value from `Future` $produceValueFromFutureFiberFuture
   `Task.withCompletionHandler` must
     write and read to and from AsynchronousSocketChannel $withCompletionHandlerSocketChannels
   """
@@ -122,26 +127,50 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     )
   }
 
-  def lazyOnParamRefFiber = {
+  def lazyOnParamRefFiberCs = {
+    var evaluated                  = false
+    def ftr: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
+    Fiber.fromCompletionStage(ftr)
+    evaluated must beFalse
+  }
+
+  def catchBlockExceptionFiberCs = {
+    val ex                              = new Exception("no future for you!")
+    def noFuture: CompletionStage[Unit] = throw ex
+    unsafeRunSync(Fiber.fromCompletionStage(noFuture).join) must_=== Exit.Failure(die(ex))
+  }
+
+  def propagateExceptionFromFutureFiberCs = {
+    val ex                             = new Exception("no value for you!")
+    def noValue: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => throw ex)
+    unsafeRunSync(Fiber.fromCompletionStage(noValue).join) must_=== Exit.Failure(fail(ex))
+  }
+
+  def produceValueFromFutureFiberCs = {
+    def someValue: CompletionStage[Int] = CompletableFuture.completedFuture(42)
+    unsafeRun(Fiber.fromCompletionStage(someValue).join) must_=== 42
+  }
+
+  def lazyOnParamRefFiberFuture = {
     var evaluated         = false
     def ftr: Future[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
     Fiber.fromFutureJava(ftr)
     evaluated must beFalse
   }
 
-  def catchBlockExceptionFiber = {
+  def catchBlockExceptionFiberFuture = {
     val ex                     = new Exception("no future for you!")
     def noFuture: Future[Unit] = throw ex
     unsafeRunSync(Fiber.fromFutureJava(noFuture).join) must_=== Exit.Failure(die(ex))
   }
 
-  def propagateExceptionFromFutureFiber = {
+  def propagateExceptionFromFutureFiberFuture = {
     val ex                    = new Exception("no value for you!")
     def noValue: Future[Unit] = CompletableFuture.supplyAsync(() => throw ex)
     unsafeRunSync(Fiber.fromFutureJava(noValue).join) must_=== Exit.Failure(fail(ex))
   }
 
-  def produceValueFromFutureFiber = {
+  def produceValueFromFutureFiberFuture = {
     def someValue: Future[Int] = CompletableFuture.completedFuture(42)
     unsafeRun(Fiber.fromFutureJava(someValue).join) must_=== 42
   }

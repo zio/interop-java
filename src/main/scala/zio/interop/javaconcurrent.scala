@@ -50,7 +50,7 @@ object javaconcurrent {
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
     csUio.map(_.toCompletableFuture).flatMap { cf =>
       if (cf.isDone) {
-        Task.effect(cf.get)
+        Task.effect(cf.get())
       } else {
         Task.effectAsync { cb =>
           val _ = cf.handle[Unit] { (v: A, t: Throwable) =>
@@ -136,17 +136,18 @@ object javaconcurrent {
 
     def fromCompletionStage[A](thunk: => CompletionStage[A]): Fiber[Throwable, A] = {
 
-      lazy val cf = thunk.toCompletableFuture
+      lazy val cs = thunk
 
       new Fiber[Throwable, A] {
 
-        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.succeed(cf)).run
+        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.effectTotal(cs)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
+            val cf = cs.toCompletableFuture
             if (cf.isDone) {
               Task
-                .fromCompletionStage(UIO.succeed(cf))
+                .effect(cf.get())
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
@@ -173,7 +174,7 @@ object javaconcurrent {
           UIO.effectSuspendTotal {
             if (ftr.isDone) {
               Task
-                .fromFutureJava(UIO.effectTotal(ftr))
+                .effect(ftr.get())
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
