@@ -151,13 +151,13 @@ object javaconcurrent {
       new Fiber[Throwable, A] {
 
         def await: UIO[Exit[Throwable, A]] =
-          Task.fromFutureJava(UIO.succeed(ftr)).run
+          Task.fromFutureJava(UIO.effectTotal(ftr)).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
             if (ftr.isDone) {
               Task
-                .fromFutureJava(UIO.succeed(ftr))
+                .fromFutureJava(UIO.effectTotal(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
