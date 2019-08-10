@@ -116,6 +116,18 @@ object javaconcurrent {
 
   }
 
+  implicit class ZioObjJavaconcurrentOps(private val taskObj: ZIO.type) extends AnyVal {
+
+    def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
+      javaconcurrent.withCompletionHandler(op)
+
+    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaconcurrent.fromCompletionStage(csUio)
+
+    /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
+    def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] = javaconcurrent.fromFutureJava(futureUio)
+
+  }
+
   implicit class FiberObjOps(private val fiberObj: Fiber.type) extends AnyVal {
 
     def fromCompletionStage[A](thunk: => CompletionStage[A]): Fiber[Throwable, A] = {
