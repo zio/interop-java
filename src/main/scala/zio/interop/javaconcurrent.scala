@@ -48,20 +48,24 @@ object javaconcurrent {
     }
 
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
-    csUio.flatMap { cs =>
-      Task.effectAsync { cb =>
-        val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
-          val io = t match {
-            case null =>
-              Task.succeed(v)
-            case e: CompletionException =>
-              Task.fail(e.getCause)
-            case NonFatal(e) =>
-              Task.fail(e)
-            case _ =>
-              Task.die(t)
+    csUio.map(_.toCompletableFuture).flatMap { cf =>
+      if (cf.isDone) {
+        Task.effect(cf.get)
+      } else {
+        Task.effectAsync { cb =>
+          val _ = cf.handle[Unit] { (v: A, t: Throwable) =>
+            val io = t match {
+              case null =>
+                Task.succeed(v)
+              case e: CompletionException =>
+                Task.fail(e.getCause)
+              case NonFatal(e) =>
+                Task.fail(e)
+              case _ =>
+                Task.die(t)
+            }
+            cb(io)
           }
-          cb(io)
         }
       }
     }
