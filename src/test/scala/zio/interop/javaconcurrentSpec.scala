@@ -18,6 +18,7 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     catch exceptions thrown by lazy block                $catchBlockException
     return an `IO` that fails if `Future` fails          $propagateExceptionFromFuture
     return an `IO` that produces the value from `Future` $produceValueFromFuture
+    handle null produced by the completed `Future`       $handleNullFromFuture
   `Task.fromCompletionStage` must
     be lazy on the `Future` parameter                    $lazyOnParamRefCs
     catch exceptions thrown by lazy block                $catchBlockExceptionCs
@@ -67,6 +68,11 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def produceValueFromFuture = {
     val someValue: UIO[Future[Int]] = UIO.succeedLazy(CompletableFuture.completedFuture(42))
     unsafeRun(Task.fromFutureJava(someValue)) must_=== 42
+  }
+
+  def handleNullFromFuture = {
+    val someValue: UIO[Future[String]] = UIO.succeedLazy(CompletableFuture.completedFuture[String](null))
+    unsafeRun(Task.fromFutureJava[String](someValue)) must_=== null
   }
 
   def lazyOnParamRefCs = {
