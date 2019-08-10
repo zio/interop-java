@@ -116,7 +116,7 @@ object javaconcurrent {
 
   }
 
-  implicit class ZioObjJavaconcurrentOps(private val taskObj: ZIO.type) extends AnyVal {
+  implicit class ZioObjJavaconcurrentOps(private val zioObj: ZIO.type) extends AnyVal {
 
     def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
       javaconcurrent.withCompletionHandler(op)
