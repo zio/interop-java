@@ -50,7 +50,18 @@ object javaconcurrent {
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
     csUio.map(_.toCompletableFuture).flatMap { cf =>
       if (cf.isDone) {
-        Task.effect(cf.get())
+        try {
+          Task.succeed(cf.get())
+        } catch {
+          case e: CompletionException =>
+            Task.fail(e.getCause)
+          case e: ExecutionException =>
+            Task.fail(e.getCause)
+          case _: InterruptedException =>
+            Task.interrupt
+          case NonFatal(e) =>
+            Task.fail(e)
+        }
       } else {
         Task.effectAsync { cb =>
           val _ = cf.handle[Unit] { (v: A, t: Throwable) =>
@@ -59,6 +70,10 @@ object javaconcurrent {
                 Task.succeed(v)
               case e: CompletionException =>
                 Task.fail(e.getCause)
+              case e: ExecutionException =>
+                Task.fail(e.getCause)
+              case _: InterruptedException =>
+                Task.interrupt
               case NonFatal(e) =>
                 Task.fail(e)
               case _ =>
@@ -77,9 +92,10 @@ object javaconcurrent {
         Task.flatten {
           Task.effect {
             try {
-              val result = f.get()
-              Task.succeed(result)
+              Task.succeed(f.get())
             } catch {
+              case e: CompletionException =>
+                Task.fail(e.getCause)
               case e: ExecutionException =>
                 Task.fail(e.getCause)
               case _: InterruptedException =>

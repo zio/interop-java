@@ -16,13 +16,15 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   `Task.fromFutureJava` must
     be lazy on the `Future` parameter                    $lazyOnParamRef
     catch exceptions thrown by lazy block                $catchBlockException
-    return an `IO` that fails if `Future` fails          $propagateExceptionFromFuture
+    return an `IO` that fails if `Future` fails 1        $propagateExceptionFromFuture1
+    return an `IO` that fails if `Future` fails 2        $propagateExceptionFromFuture2
     return an `IO` that produces the value from `Future` $produceValueFromFuture
     handle null produced by the completed `Future`       $handleNullFromFuture
   `Task.fromCompletionStage` must
     be lazy on the `Future` parameter                    $lazyOnParamRefCs
     catch exceptions thrown by lazy block                $catchBlockExceptionCs
-    return an `IO` that fails if `Future` fails          $propagateExceptionFromCs
+    return an `IO` that fails if `Future` fails 1        $propagateExceptionFromCs1
+    return an `IO` that fails if `Future` fails 2        $propagateExceptionFromCs2
     return an `IO` that produces the value from `Future` $produceValueFromCs
     handle null produced by the completed `Future`       $handleNullFromCs
   `Task.toCompletableFuture` must
@@ -35,12 +37,14 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   `Fiber.fromCompletionStage` must
     be lazy on the `Future` parameter                    $lazyOnParamRefFiberCs
     catch exceptions thrown by lazy block                $catchBlockExceptionFiberCs
-    return an `IO` that fails if `Future` fails          $propagateExceptionFromFutureFiberCs
+    return an `IO` that fails if `Future` fails 1        $propagateExceptionFromFutureFiberCs1
+    return an `IO` that fails if `Future` fails 2        $propagateExceptionFromFutureFiberCs2
     return an `IO` that produces the value from `Future` $produceValueFromFutureFiberCs
   `Fiber.fromFutureJava` must
     be lazy on the `Future` parameter                    $lazyOnParamRefFiberFuture
     catch exceptions thrown by lazy block                $catchBlockExceptionFiberFuture
-    return an `IO` that fails if `Future` fails          $propagateExceptionFromFutureFiberFuture
+    return an `IO` that fails if `Future` fails 1        $propagateExceptionFromFutureFiberFuture1
+    return an `IO` that fails if `Future` fails 2        $propagateExceptionFromFutureFiberFuture2
     return an `IO` that produces the value from `Future` $produceValueFromFutureFiberFuture
   `Task.withCompletionHandler` must
     write and read to and from AsynchronousSocketChannel $withCompletionHandlerSocketChannels
@@ -59,7 +63,13 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     unsafeRunSync(Task.fromFutureJava(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
-  def propagateExceptionFromFuture = {
+  def propagateExceptionFromFuture1 = {
+    val ex                         = new Exception("no value for you!")
+    val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
+    unsafeRunSync(Task.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
+  }
+
+  def propagateExceptionFromFuture2 = {
     val ex                         = new Exception("no value for you!")
     val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
     unsafeRunSync(Task.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
@@ -88,7 +98,13 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     unsafeRunSync(Task.fromCompletionStage(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
-  def propagateExceptionFromCs = {
+  def propagateExceptionFromCs1 = {
+    val ex                                  = new Exception("no value for you!")
+    val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
+    unsafeRunSync(Task.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
+  }
+
+  def propagateExceptionFromCs2 = {
     val ex                                  = new Exception("no value for you!")
     val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
     unsafeRunSync(Task.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
@@ -146,7 +162,13 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     unsafeRunSync(Fiber.fromCompletionStage(noFuture).join) must_=== Exit.Failure(die(ex))
   }
 
-  def propagateExceptionFromFutureFiberCs = {
+  def propagateExceptionFromFutureFiberCs1 = {
+    val ex                             = new Exception("no value for you!")
+    def noValue: CompletionStage[Unit] = CompletableFuture_.failedFuture(ex)
+    unsafeRunSync(Fiber.fromCompletionStage(noValue).join) must_=== Exit.Failure(fail(ex))
+  }
+
+  def propagateExceptionFromFutureFiberCs2 = {
     val ex                             = new Exception("no value for you!")
     def noValue: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => throw ex)
     unsafeRunSync(Fiber.fromCompletionStage(noValue).join) must_=== Exit.Failure(fail(ex))
@@ -170,7 +192,13 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     unsafeRunSync(Fiber.fromFutureJava(noFuture).join) must_=== Exit.Failure(die(ex))
   }
 
-  def propagateExceptionFromFutureFiberFuture = {
+  def propagateExceptionFromFutureFiberFuture1 = {
+    val ex                    = new Exception("no value for you!")
+    def noValue: Future[Unit] = CompletableFuture_.failedFuture(ex)
+    unsafeRunSync(Fiber.fromFutureJava(noValue).join) must_=== Exit.Failure(fail(ex))
+  }
+
+  def propagateExceptionFromFutureFiberFuture2 = {
     val ex                    = new Exception("no value for you!")
     def noValue: Future[Unit] = CompletableFuture.supplyAsync(() => throw ex)
     unsafeRunSync(Fiber.fromFutureJava(noValue).join) must_=== Exit.Failure(fail(ex))
