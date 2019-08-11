@@ -47,39 +47,34 @@ object javaconcurrent {
       }
     }
 
+  private def catchFromGet[A]: PartialFunction[Throwable, Task[A]] = {
+    case e: CompletionException =>
+      Task.fail(e.getCause)
+    case e: ExecutionException =>
+      Task.fail(e.getCause)
+    case _: InterruptedException =>
+      Task.interrupt
+    case NonFatal(e) =>
+      Task.fail(e)
+  }
+
+  private def unwrapDone[A](f: Future[A]): Task[A] =
+    try {
+      Task.succeed(f.get())
+    } catch catchFromGet
+
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
     csUio.flatMap { cs =>
       val cf = cs.toCompletableFuture
       if (cf.isDone) {
-        try {
-          Task.succeed(cf.get())
-        } catch {
-          case e: CompletionException =>
-            Task.fail(e.getCause)
-          case e: ExecutionException =>
-            Task.fail(e.getCause)
-          case _: InterruptedException =>
-            Task.interrupt
-          case NonFatal(e) =>
-            Task.fail(e)
-        }
+        unwrapDone(cf)
       } else {
         Task.effectAsync { cb =>
           val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
-            val io = t match {
-              case null =>
-                Task.succeed(v)
-              case e: CompletionException =>
-                Task.fail(e.getCause)
-              case e: ExecutionException =>
-                Task.fail(e.getCause)
-              case _: InterruptedException =>
-                Task.interrupt
-              case NonFatal(e) =>
-                Task.fail(e)
-              case _ =>
-                Task.die(t)
-            }
+            val io = Option(t).fold(
+              Task.succeed(v),
+              catchFromGet orElse { case _ => Task.die(t) }
+            )
             cb(io)
           }
         }
@@ -89,24 +84,10 @@ object javaconcurrent {
   /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
   def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
     futureUio.flatMap { future =>
-      def unwrap[B](f: Future[B]): Task[B] =
-        try {
-          Task.succeed(f.get())
-        } catch {
-          case e: CompletionException =>
-            Task.fail(e.getCause)
-          case e: ExecutionException =>
-            Task.fail(e.getCause)
-          case _: InterruptedException =>
-            Task.interrupt
-          case NonFatal(e) =>
-            Task.fail(e)
-        }
-
       if (future.isDone) {
-        unwrap(future)
+        unwrapDone(future)
       } else {
-        blocking(Task.effectSuspend(unwrap(future))).provide(Blocking.Live)
+        blocking(Task.effectSuspend(unwrapDone(future))).provide(Blocking.Live)
       }
     }
 
@@ -159,7 +140,7 @@ object javaconcurrent {
             val cf = cs.toCompletableFuture
             if (cf.isDone) {
               Task
-                .effect(cf.get())
+                .effectSuspend(unwrapDone(cf))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
@@ -186,7 +167,7 @@ object javaconcurrent {
           UIO.effectSuspendTotal {
             if (ftr.isDone) {
               Task
-                .effect(ftr.get())
+                .effectSuspend(unwrapDone(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
