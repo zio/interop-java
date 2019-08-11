@@ -23,57 +23,57 @@ import zio._
 import zio.blocking.{ blocking, Blocking }
 
 import scala.concurrent.ExecutionException
-import scala.util.control.NonFatal
 
 object javaconcurrent {
 
   def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
-    Task.effectAsync[T] { k =>
-      val handler = new CompletionHandler[T, Any] {
-        def completed(result: T, u: Any): Unit =
-          k(Task.succeed(result))
+    Task.effectSuspendTotalWith { p =>
+      Task.effectAsync { k =>
+        val handler = new CompletionHandler[T, Any] {
 
-        def failed(t: Throwable, u: Any): Unit =
-          t match {
-            case NonFatal(e) => k(Task.fail(e))
-            case _           => k(Task.die(t))
+          def completed(result: T, u: Any): Unit = k(Task.succeed(result))
+
+          def failed(t: Throwable, u: Any): Unit = t match {
+            case e if !p.fatal(e) => k(Task.fail(e))
+            case _                => k(Task.die(t))
           }
-      }
+        }
 
-      try {
-        op(handler)
-      } catch {
-        case NonFatal(e) => k(Task.fail(e))
+        try {
+          op(handler)
+        } catch {
+          case e if !p.fatal(e) => k(Task.fail(e))
+        }
       }
     }
 
-  private def catchFromGet: PartialFunction[Throwable, Task[Nothing]] = {
+  private def catchFromGet(isFatal: Throwable => Boolean): PartialFunction[Throwable, Task[Nothing]] = {
     case e: CompletionException =>
       Task.fail(e.getCause)
     case e: ExecutionException =>
       Task.fail(e.getCause)
     case _: InterruptedException =>
       Task.interrupt
-    case NonFatal(e) =>
+    case e if !isFatal(e) =>
       Task.fail(e)
   }
 
-  private def unwrapDone[A](f: Future[A]): Task[A] =
+  private def unwrapDone[A](isFatal: Throwable => Boolean)(f: Future[A]): Task[A] =
     try {
       Task.succeed(f.get())
-    } catch catchFromGet
+    } catch catchFromGet(isFatal)
 
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
     csUio.flatMap { cs =>
-      Task.effectSuspendTotal {
+      Task.effectSuspendTotalWith { p =>
         val cf = cs.toCompletableFuture
         if (cf.isDone) {
-          unwrapDone(cf)
+          unwrapDone(p.fatal)(cf)
         } else {
           Task.effectAsync { cb =>
             val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
               val io = Option(t).fold[Task[A]](Task.succeed(v)) { t =>
-                catchFromGet.lift(t).getOrElse(Task.die(t))
+                catchFromGet(p.fatal).lift(t).getOrElse(Task.die(t))
               }
               cb(io)
             }
@@ -85,11 +85,11 @@ object javaconcurrent {
   /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
   def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
     futureUio.flatMap { future =>
-      Task.effectSuspendTotal {
+      Task.effectSuspendTotalWith { p =>
         if (future.isDone) {
-          unwrapDone(future)
+          unwrapDone(p.fatal)(future)
         } else {
-          blocking(Task.effectSuspend(unwrapDone(future))).provide(Blocking.Live)
+          blocking(Task.effectSuspend(unwrapDone(p.fatal)(future))).provide(Blocking.Live)
         }
       }
     }
@@ -139,11 +139,11 @@ object javaconcurrent {
         override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.effectTotal(cs)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
-          UIO.effectSuspendTotal {
+          UIO.effectSuspendTotalWith { p =>
             val cf = cs.toCompletableFuture
             if (cf.isDone) {
               Task
-                .effectSuspend(unwrapDone(cf))
+                .effectSuspend(unwrapDone(p.fatal)(cf))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
@@ -167,10 +167,10 @@ object javaconcurrent {
           Task.fromFutureJava(UIO.effectTotal(ftr)).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
-          UIO.effectSuspendTotal {
+          UIO.effectSuspendTotalWith { p =>
             if (ftr.isDone) {
               Task
-                .effectSuspend(unwrapDone(ftr))
+                .effectSuspend(unwrapDone(p.fatal)(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
