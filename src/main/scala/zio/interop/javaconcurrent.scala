@@ -65,16 +65,18 @@ object javaconcurrent {
 
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
     csUio.flatMap { cs =>
-      val cf = cs.toCompletableFuture
-      if (cf.isDone) {
-        unwrapDone(cf)
-      } else {
-        Task.effectAsync { cb =>
-          val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
-            val io = Option(t).fold[Task[A]](Task.succeed(v)) { t =>
-              catchFromGet.lift(t).getOrElse(Task.die(t))
+      Task.effectSuspendTotal {
+        val cf = cs.toCompletableFuture
+        if (cf.isDone) {
+          unwrapDone(cf)
+        } else {
+          Task.effectAsync { cb =>
+            val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
+              val io = Option(t).fold[Task[A]](Task.succeed(v)) { t =>
+                catchFromGet.lift(t).getOrElse(Task.die(t))
+              }
+              cb(io)
             }
-            cb(io)
           }
         }
       }
@@ -83,10 +85,12 @@ object javaconcurrent {
   /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
   def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
     futureUio.flatMap { future =>
-      if (future.isDone) {
-        unwrapDone(future)
-      } else {
-        blocking(Task.effectSuspend(unwrapDone(future))).provide(Blocking.Live)
+      Task.effectSuspendTotal {
+        if (future.isDone) {
+          unwrapDone(future)
+        } else {
+          blocking(Task.effectSuspend(unwrapDone(future))).provide(Blocking.Live)
+        }
       }
     }
 
