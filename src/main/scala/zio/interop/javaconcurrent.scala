@@ -48,7 +48,8 @@ object javaconcurrent {
     }
 
   def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] =
-    csUio.map(_.toCompletableFuture).flatMap { cf =>
+    csUio.flatMap { cs =>
+      val cf = cs.toCompletableFuture
       if (cf.isDone) {
         try {
           Task.succeed(cf.get())
@@ -64,7 +65,7 @@ object javaconcurrent {
         }
       } else {
         Task.effectAsync { cb =>
-          val _ = cf.handle[Unit] { (v: A, t: Throwable) =>
+          val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
             val io = t match {
               case null =>
                 Task.succeed(v)
@@ -89,29 +90,24 @@ object javaconcurrent {
   def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
     futureUio.flatMap { future =>
       def unwrap[B](f: Future[B]): Task[B] =
-        Task.flatten {
-          Task.effect {
-            try {
-              Task.succeed(f.get())
-            } catch {
-              case e: CompletionException =>
-                Task.fail(e.getCause)
-              case e: ExecutionException =>
-                Task.fail(e.getCause)
-              case _: InterruptedException =>
-                Task.interrupt
-            }
-          }
+        try {
+          Task.succeed(f.get())
+        } catch {
+          case e: CompletionException =>
+            Task.fail(e.getCause)
+          case e: ExecutionException =>
+            Task.fail(e.getCause)
+          case _: InterruptedException =>
+            Task.interrupt
+          case NonFatal(e) =>
+            Task.fail(e)
         }
 
-      for {
-        isDone <- Task.effect(future.isDone)
-        result <- if (isDone) {
-                   unwrap(future)
-                 } else {
-                   blocking(unwrap(future)).provide(Blocking.Live)
-                 }
-      } yield result
+      if (future.isDone) {
+        unwrap(future)
+      } else {
+        blocking(Task.effectSuspend(unwrap(future))).provide(Blocking.Live)
+      }
     }
 
   implicit class CompletionStageJavaconcurrentOps[A](private val csUio: UIO[CompletionStage[A]]) extends AnyVal {
