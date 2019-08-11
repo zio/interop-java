@@ -139,11 +139,11 @@ object javaconcurrent {
         override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.effectTotal(cs)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
-          UIO.effectSuspendTotalWith { p =>
+          UIO.effectSuspendTotal {
             val cf = cs.toCompletableFuture
             if (cf.isDone) {
               Task
-                .effectSuspend(unwrapDone(p.fatal)(cf))
+                .effectSuspendWith(p => unwrapDone(p.fatal)(cf))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
@@ -167,10 +167,10 @@ object javaconcurrent {
           Task.fromFutureJava(UIO.effectTotal(ftr)).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
-          UIO.effectSuspendTotalWith { p =>
+          UIO.effectSuspendTotal {
             if (ftr.isDone) {
               Task
-                .effectSuspend(unwrapDone(p.fatal)(ftr))
+                .effectSuspendWith(p => unwrapDone(p.fatal)(ftr))
                 .fold(Exit.fail, Exit.succeed)
                 .map(Some(_))
             } else {
