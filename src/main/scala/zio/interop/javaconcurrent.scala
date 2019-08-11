@@ -47,7 +47,7 @@ object javaconcurrent {
       }
     }
 
-  private def catchFromGet[A]: PartialFunction[Throwable, Task[A]] = {
+  private def catchFromGet: PartialFunction[Throwable, Task[Nothing]] = {
     case e: CompletionException =>
       Task.fail(e.getCause)
     case e: ExecutionException =>
@@ -71,10 +71,9 @@ object javaconcurrent {
       } else {
         Task.effectAsync { cb =>
           val _ = cs.handle[Unit] { (v: A, t: Throwable) =>
-            val io = Option(t).fold(
-              Task.succeed(v),
-              catchFromGet orElse { case _ => Task.die(t) }
-            )
+            val io = Option(t).fold[Task[A]](Task.succeed(v)) { t =>
+              catchFromGet.lift(t).getOrElse(Task.die(t))
+            }
             cb(io)
           }
         }
