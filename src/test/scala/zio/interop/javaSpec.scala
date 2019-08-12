@@ -1,16 +1,16 @@
 package zio
 package interop
 
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.channels.{ AsynchronousServerSocketChannel, AsynchronousSocketChannel }
-import java.util.concurrent.{ CompletableFuture, CompletionStage, Future }
+import _root_.java.net.InetSocketAddress
+import _root_.java.nio.ByteBuffer
+import _root_.java.nio.channels.{ AsynchronousServerSocketChannel, AsynchronousSocketChannel }
+import _root_.java.util.concurrent.{ CompletableFuture, CompletionStage, Future }
 
 import org.specs2.concurrent.ExecutionEnv
 import zio.Cause.{ die, fail }
-import zio.interop.javaconcurrent._
+import zio.interop.java._
 
-class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
+class javaSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 
   def is = s2"""
   `Task.fromFutureJava` must
@@ -53,71 +53,71 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def lazyOnParamRef = {
     var evaluated         = false
     def ftr: Future[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-    Task.fromFutureJava(UIO.succeedLazy(ftr))
+    ZIO.fromFutureJava(UIO.succeedLazy(ftr))
     evaluated must beFalse
   }
 
   def catchBlockException = {
     val ex                          = new Exception("no future for you!")
     val noFuture: UIO[Future[Unit]] = UIO.succeedLazy(throw ex)
-    unsafeRunSync(Task.fromFutureJava(noFuture)) must_=== Exit.Failure(die(ex))
+    unsafeRunSync(ZIO.fromFutureJava(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
   def propagateExceptionFromFuture1 = {
     val ex                         = new Exception("no value for you!")
     val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
-    unsafeRunSync(Task.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
+    unsafeRunSync(ZIO.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def propagateExceptionFromFuture2 = {
     val ex                         = new Exception("no value for you!")
     val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
-    unsafeRunSync(Task.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
+    unsafeRunSync(ZIO.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def produceValueFromFuture = {
     val someValue: UIO[Future[Int]] = UIO.succeedLazy(CompletableFuture.completedFuture(42))
-    unsafeRun(Task.fromFutureJava(someValue)) must_=== 42
+    unsafeRun(ZIO.fromFutureJava(someValue)) must_=== 42
   }
 
   def handleNullFromFuture = {
     val someValue: UIO[Future[String]] = UIO.succeedLazy(CompletableFuture.completedFuture[String](null))
-    unsafeRun(Task.fromFutureJava[String](someValue)) must_=== null
+    unsafeRun(ZIO.fromFutureJava[String](someValue)) must_=== null
   }
 
   def lazyOnParamRefCs = {
     var evaluated                 = false
     def cs: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-    Task.fromCompletionStage(UIO.succeedLazy(cs))
+    ZIO.fromCompletionStage(UIO.succeedLazy(cs))
     evaluated must beFalse
   }
 
   def catchBlockExceptionCs = {
     val ex                                   = new Exception("no future for you!")
     val noFuture: UIO[CompletionStage[Unit]] = UIO.succeedLazy(throw ex)
-    unsafeRunSync(Task.fromCompletionStage(noFuture)) must_=== Exit.Failure(die(ex))
+    unsafeRunSync(ZIO.fromCompletionStage(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
   def propagateExceptionFromCs1 = {
     val ex                                  = new Exception("no value for you!")
     val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
-    unsafeRunSync(Task.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
+    unsafeRunSync(ZIO.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def propagateExceptionFromCs2 = {
     val ex                                  = new Exception("no value for you!")
     val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
-    unsafeRunSync(Task.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
+    unsafeRunSync(ZIO.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def produceValueFromCs = {
     val someValue: UIO[CompletionStage[Int]] = UIO.succeedLazy(CompletableFuture.completedFuture(42))
-    unsafeRun(Task.fromCompletionStage(someValue)) must_=== 42
+    unsafeRun(ZIO.fromCompletionStage(someValue)) must_=== 42
   }
 
   def handleNullFromCs = {
     val someValue: UIO[CompletionStage[String]] = UIO.succeedLazy(CompletableFuture.completedFuture[String](null))
-    unsafeRun(Task.fromCompletionStage[String](someValue)) must_=== null
+    unsafeRun(ZIO.fromCompletionStage[String](someValue)) must_=== null
   }
 
   def toCompletableFutureAlwaysSucceeds = {
@@ -216,14 +216,14 @@ class javaconcurrentSpec(implicit ee: ExecutionEnv) extends TestRuntime {
     val client           = AsynchronousSocketChannel.open()
 
     val taskServer = for {
-      c <- Task.withCompletionHandler[AsynchronousSocketChannel](server.accept((), _))
-      w <- Task.withCompletionHandler[Integer](c.write(ByteBuffer.wrap(list.toArray), (), _))
+      c <- ZIO.withCompletionHandler[AsynchronousSocketChannel](server.accept((), _))
+      w <- ZIO.withCompletionHandler[Integer](c.write(ByteBuffer.wrap(list.toArray), (), _))
     } yield w
 
     val taskClient = for {
-      _      <- Task.withCompletionHandler[Void](client.connect(address, (), _))
+      _      <- ZIO.withCompletionHandler[Void](client.connect(address, (), _))
       buffer = ByteBuffer.allocate(1)
-      r      <- Task.withCompletionHandler[Integer](client.read(buffer, (), _))
+      r      <- ZIO.withCompletionHandler[Integer](client.read(buffer, (), _))
     } yield (r, buffer.array.toList)
 
     val task = for {

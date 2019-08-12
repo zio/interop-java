@@ -16,15 +16,15 @@
 
 package zio.interop
 
-import java.nio.channels.CompletionHandler
-import java.util.concurrent.{ CompletableFuture, CompletionException, CompletionStage, Future }
+import _root_.java.nio.channels.CompletionHandler
+import _root_.java.util.concurrent.{ CompletableFuture, CompletionException, CompletionStage, Future }
 
 import zio._
 import zio.blocking.{ blocking, Blocking }
 
 import scala.concurrent.ExecutionException
 
-object javaconcurrent {
+object java {
 
   def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
     Task.effectSuspendTotalWith { p =>
@@ -83,48 +83,36 @@ object javaconcurrent {
     }
 
   /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
-  def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] =
+  def fromFutureJava[A](futureUio: UIO[Future[A]]): RIO[Blocking, A] =
     futureUio.flatMap { future =>
-      Task.effectSuspendTotalWith { p =>
+      RIO.effectSuspendTotalWith { p =>
         if (future.isDone) {
           unwrapDone(p.fatal)(future)
         } else {
-          blocking(Task.effectSuspend(unwrapDone(p.fatal)(future))).provide(Blocking.Live)
+          blocking(Task.effectSuspend(unwrapDone(p.fatal)(future)))
         }
       }
     }
 
   implicit class CompletionStageJavaconcurrentOps[A](private val csUio: UIO[CompletionStage[A]]) extends AnyVal {
-    def toZio: Task[A] = Task.fromCompletionStage(csUio)
+    def toZio: Task[A] = ZIO.fromCompletionStage(csUio)
   }
 
   implicit class FutureJavaconcurrentOps[A](private val futureUio: UIO[Future[A]]) extends AnyVal {
 
     /** WARNING: this uses the blocking Future#get, consider using `CompletionStage` */
-    def toZio: Task[A] = Task.fromFutureJava(futureUio)
-  }
-
-  implicit class TaskObjJavaconcurrentOps(private val taskObj: Task.type) extends AnyVal {
-
-    def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
-      javaconcurrent.withCompletionHandler(op)
-
-    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaconcurrent.fromCompletionStage(csUio)
-
-    /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
-    def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] = javaconcurrent.fromFutureJava(futureUio)
-
+    def toZio: RIO[Blocking, A] = ZIO.fromFutureJava(futureUio)
   }
 
   implicit class ZioObjJavaconcurrentOps(private val zioObj: ZIO.type) extends AnyVal {
 
     def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
-      javaconcurrent.withCompletionHandler(op)
+      java.withCompletionHandler(op)
 
-    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaconcurrent.fromCompletionStage(csUio)
+    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = java.fromCompletionStage(csUio)
 
     /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
-    def fromFutureJava[A](futureUio: UIO[Future[A]]): Task[A] = javaconcurrent.fromFutureJava(futureUio)
+    def fromFutureJava[A](futureUio: UIO[Future[A]]): RIO[Blocking, A] = java.fromFutureJava(futureUio)
 
   }
 
@@ -136,7 +124,7 @@ object javaconcurrent {
 
       new Fiber[Throwable, A] {
 
-        override def await: UIO[Exit[Throwable, A]] = Task.fromCompletionStage(UIO.effectTotal(cs)).run
+        override def await: UIO[Exit[Throwable, A]] = ZIO.fromCompletionStage(UIO.effectTotal(cs)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
@@ -157,6 +145,7 @@ object javaconcurrent {
       }
     }
 
+    /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
     def fromFutureJava[A](thunk: => Future[A]): Fiber[Throwable, A] = {
 
       lazy val ftr = thunk
@@ -164,7 +153,7 @@ object javaconcurrent {
       new Fiber[Throwable, A] {
 
         def await: UIO[Exit[Throwable, A]] =
-          Task.fromFutureJava(UIO.effectTotal(ftr)).run
+          ZIO.fromFutureJava(UIO.effectTotal(ftr)).provide(Blocking.Live).run
 
         def poll: UIO[Option[Exit[Throwable, A]]] =
           UIO.effectSuspendTotal {
