@@ -8,7 +8,7 @@ import _root_.java.util.concurrent.{ CompletableFuture, CompletionStage, Future 
 
 import org.specs2.concurrent.ExecutionEnv
 import zio.Cause.{ die, fail }
-import zio.interop.java._
+import zio.interop.javaz._
 
 class javaSpec(implicit ee: ExecutionEnv) extends TestRuntime {
 

@@ -24,7 +24,7 @@ import zio.blocking.{ blocking, Blocking }
 
 import scala.concurrent.ExecutionException
 
-object java {
+object javaz {
 
   def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
     Task.effectSuspendTotalWith { p =>
@@ -107,12 +107,12 @@ object java {
   implicit class ZioObjJavaconcurrentOps(private val zioObj: ZIO.type) extends AnyVal {
 
     def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
-      java.withCompletionHandler(op)
+      javaz.withCompletionHandler(op)
 
-    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = java.fromCompletionStage(csUio)
+    def fromCompletionStage[A](csUio: UIO[CompletionStage[A]]): Task[A] = javaz.fromCompletionStage(csUio)
 
     /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
-    def fromFutureJava[A](futureUio: UIO[Future[A]]): RIO[Blocking, A] = java.fromFutureJava(futureUio)
+    def fromFutureJava[A](futureUio: UIO[Future[A]]): RIO[Blocking, A] = javaz.fromFutureJava(futureUio)
 
   }
 
