@@ -33,8 +33,8 @@ lazy val java = project
   .settings(buildInfoSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "dev.zio"    %% "zio"                  % "1.0.0-RC11-1",
-      "dev.zio"    %% "core-tests"           % "1.0.0-RC11-1" % Test classifier "tests",
+      "dev.zio"    %% "zio"                  % "1.0.0-RC12",
+      "dev.zio"    %% "core-tests"           % "1.0.0-RC12" % Test classifier "tests",
       "org.specs2" %% "specs2-core"          % "4.7.0" % Test,
       "org.specs2" %% "specs2-matcher-extra" % "4.7.0" % Test
     )
