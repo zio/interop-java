@@ -53,70 +53,70 @@ class javaSpec(implicit ee: ExecutionEnv) extends TestRuntime {
   def lazyOnParamRef = {
     var evaluated         = false
     def ftr: Future[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-    ZIO.fromFutureJava(UIO.succeedLazy(ftr))
+    ZIO.fromFutureJava(UIO.effectTotal(ftr))
     evaluated must beFalse
   }
 
   def catchBlockException = {
     val ex                          = new Exception("no future for you!")
-    val noFuture: UIO[Future[Unit]] = UIO.succeedLazy(throw ex)
+    val noFuture: UIO[Future[Unit]] = UIO.effectTotal(throw ex)
     unsafeRunSync(ZIO.fromFutureJava(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
   def propagateExceptionFromFuture1 = {
     val ex                         = new Exception("no value for you!")
-    val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
+    val noValue: UIO[Future[Unit]] = UIO.effectTotal(CompletableFuture_.failedFuture(ex))
     unsafeRunSync(ZIO.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def propagateExceptionFromFuture2 = {
     val ex                         = new Exception("no value for you!")
-    val noValue: UIO[Future[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
+    val noValue: UIO[Future[Unit]] = UIO.effectTotal(CompletableFuture.supplyAsync(() => throw ex))
     unsafeRunSync(ZIO.fromFutureJava(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def produceValueFromFuture = {
-    val someValue: UIO[Future[Int]] = UIO.succeedLazy(CompletableFuture.completedFuture(42))
+    val someValue: UIO[Future[Int]] = UIO.effectTotal(CompletableFuture.completedFuture(42))
     unsafeRun(ZIO.fromFutureJava(someValue)) must_=== 42
   }
 
   def handleNullFromFuture = {
-    val someValue: UIO[Future[String]] = UIO.succeedLazy(CompletableFuture.completedFuture[String](null))
+    val someValue: UIO[Future[String]] = UIO.effectTotal(CompletableFuture.completedFuture[String](null))
     unsafeRun(ZIO.fromFutureJava[String](someValue)) must_=== null
   }
 
   def lazyOnParamRefCs = {
     var evaluated                 = false
     def cs: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-    ZIO.fromCompletionStage(UIO.succeedLazy(cs))
+    ZIO.fromCompletionStage(UIO.effectTotal(cs))
     evaluated must beFalse
   }
 
   def catchBlockExceptionCs = {
     val ex                                   = new Exception("no future for you!")
-    val noFuture: UIO[CompletionStage[Unit]] = UIO.succeedLazy(throw ex)
+    val noFuture: UIO[CompletionStage[Unit]] = UIO.effectTotal(throw ex)
     unsafeRunSync(ZIO.fromCompletionStage(noFuture)) must_=== Exit.Failure(die(ex))
   }
 
   def propagateExceptionFromCs1 = {
     val ex                                  = new Exception("no value for you!")
-    val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture_.failedFuture(ex))
+    val noValue: UIO[CompletionStage[Unit]] = UIO.effectTotal(CompletableFuture_.failedFuture(ex))
     unsafeRunSync(ZIO.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def propagateExceptionFromCs2 = {
     val ex                                  = new Exception("no value for you!")
-    val noValue: UIO[CompletionStage[Unit]] = UIO.succeedLazy(CompletableFuture.supplyAsync(() => throw ex))
+    val noValue: UIO[CompletionStage[Unit]] = UIO.effectTotal(CompletableFuture.supplyAsync(() => throw ex))
     unsafeRunSync(ZIO.fromCompletionStage(noValue)) must_=== Exit.Failure(fail(ex))
   }
 
   def produceValueFromCs = {
-    val someValue: UIO[CompletionStage[Int]] = UIO.succeedLazy(CompletableFuture.completedFuture(42))
+    val someValue: UIO[CompletionStage[Int]] = UIO.effectTotal(CompletableFuture.completedFuture(42))
     unsafeRun(ZIO.fromCompletionStage(someValue)) must_=== 42
   }
 
   def handleNullFromCs = {
-    val someValue: UIO[CompletionStage[String]] = UIO.succeedLazy(CompletableFuture.completedFuture[String](null))
+    val someValue: UIO[CompletionStage[String]] = UIO.effectTotal(CompletableFuture.completedFuture[String](null))
     unsafeRun(ZIO.fromCompletionStage[String](someValue)) must_=== null
   }
 
