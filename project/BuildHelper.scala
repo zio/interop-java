@@ -9,7 +9,7 @@ object BuildHelper {
   private val SilencerVersion = "1.4.3"
 
   val testDeps        = Seq("org.scalacheck"  %% "scalacheck"  % "1.14.1"        % "test")
-  val compileOnlyDeps = Seq("com.github.ghik" % "silencer-lib" % SilencerVersion % Provided cross CrossVersion.full)
+  val compileOnlyDeps = Seq("com.github.ghik" %% "silencer-lib" % SilencerVersion % Provided)
 
   private val stdOptions = Seq(
     "-deprecation",
