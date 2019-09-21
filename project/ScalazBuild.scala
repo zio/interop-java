@@ -66,7 +66,7 @@ object ScalazBuild {
           "-Xexperimental",
           "-Ywarn-unused-import",
           "-Xfuture"
-    ) ++ std2xOptions
+        ) ++ std2xOptions
       case _ => Seq.empty
     }
 
@@ -77,7 +77,7 @@ object ScalazBuild {
     scalaVersion in ThisBuild := crossScalaVersions.value.head,
     scalacOptions := stdOptions ++ extraOptions(scalaVersion.value),
     libraryDependencies ++= compileOnlyDeps ++ testDeps ++ Seq(
-      compilerPlugin("org.typelevel"   %% "kind-projector"  % "0.10.3"),
+      compilerPlugin("org.typelevel"   %% "kind-projector" % "0.10.3"),
       compilerPlugin("com.github.ghik" % "silencer-plugin" % "1.4.3" cross CrossVersion.full)
     ),
     parallelExecution in Test := true,
