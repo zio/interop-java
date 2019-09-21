@@ -47,6 +47,22 @@ jobs:
             - "~/.sbt"
             - "~/.m2"
 
+  test213_jvm_jdk8:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - restore_cache:
+          key: sbt-cache-machine
+      - run: sbt ++2.13.1! test
+      - run: sbt ++2.13.1! package packageSrc publishLocal
+      - save_cache:
+          key: sbt-cache-machine
+          paths:
+            - "~/.ivy2/cache"
+            - "~/.sbt"
+            - "~/.m2"
+
   release:
     docker:
       - image: hseeberger/scala-sbt:8u181_2.12.8_1.2.8
