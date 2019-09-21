@@ -5,9 +5,11 @@ import explicitdeps.ExplicitDepsPlugin.autoImport._
 import sbtbuildinfo._
 import BuildInfoKeys._
 
-object ScalazBuild {
-  val testDeps        = Seq("org.scalacheck"  %% "scalacheck"   % "1.14.1" % "test")
-  val compileOnlyDeps = Seq("com.github.ghik" %% "silencer-lib" % "1.4.2"  % "provided")
+object BuildHelper {
+  private val SilencerVersion = "1.4.3"
+
+  val testDeps        = Seq("org.scalacheck"  %% "scalacheck"  % "1.14.1"        % "test")
+  val compileOnlyDeps = Seq("com.github.ghik" % "silencer-lib" % SilencerVersion % Provided cross CrossVersion.full)
 
   private val stdOptions = Seq(
     "-deprecation",
@@ -23,7 +25,6 @@ object ScalazBuild {
     "-language:existentials",
     "-explaintypes",
     "-Yrangepos",
-    "-Xfuture",
     "-Xsource:2.13",
     "-Xlint:_,-type-parameter-shadow",
     "-Ywarn-numeric-widen",
@@ -53,7 +54,8 @@ object ScalazBuild {
           "-Ywarn-inaccessible",
           "-Ywarn-infer-any",
           "-Ywarn-nullary-override",
-          "-Ywarn-nullary-unit"
+          "-Ywarn-nullary-unit",
+          "-Xfuture"
         ) ++ std2xOptions
       case Some((2, 11)) =>
         Seq(
@@ -64,7 +66,8 @@ object ScalazBuild {
           "-Ywarn-nullary-override",
           "-Ywarn-nullary-unit",
           "-Xexperimental",
-          "-Ywarn-unused-import"
+          "-Ywarn-unused-import",
+          "-Xfuture"
         ) ++ std2xOptions
       case _ => Seq.empty
     }
@@ -72,12 +75,12 @@ object ScalazBuild {
   def stdSettings(prjName: String) = Seq(
     name := s"$prjName",
     scalacOptions := stdOptions,
-    crossScalaVersions := Seq("2.12.8", "2.11.12"),
+    crossScalaVersions := Seq("2.13.0", "2.12.8", "2.11.12"),
     scalaVersion in ThisBuild := crossScalaVersions.value.head,
     scalacOptions := stdOptions ++ extraOptions(scalaVersion.value),
     libraryDependencies ++= compileOnlyDeps ++ testDeps ++ Seq(
-      compilerPlugin("org.typelevel"   %% "kind-projector"  % "0.10.3"),
-      compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.4.2")
+      compilerPlugin("org.typelevel"   %% "kind-projector" % "0.10.3"),
+      compilerPlugin("com.github.ghik" % "silencer-plugin" % SilencerVersion cross CrossVersion.full)
     ),
     parallelExecution in Test := true,
     incOptions ~= (_.withLogRecompileOnMacro(false))
