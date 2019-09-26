@@ -8,7 +8,7 @@ import BuildInfoKeys._
 object BuildHelper {
   private val SilencerVersion = "1.4.3"
 
-  val testDeps        = Seq("org.scalacheck"  %% "scalacheck"  % "1.14.1"        % "test")
+  val testDeps        = Seq("org.scalacheck"  %% "scalacheck"  % "1.14.2"        % "test")
   val compileOnlyDeps = Seq("com.github.ghik" % "silencer-lib" % SilencerVersion % Provided cross CrossVersion.full)
 
   private val stdOptions = Seq(
