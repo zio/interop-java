@@ -15,7 +15,7 @@ object JavaSpec {
       testM("be lazy on the `Future` parameter") {
         var evaluated         = false
         def ftr: Future[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-        assertM(ZIO.fromFutureJava(UIO.effectTotal(ftr)).as(evaluated).run, succeeds(isFalse))
+        assertM(ZIO.fromFutureJava(UIO.effectTotal(ftr)).when(false).as(evaluated), isFalse)
       },
       testM("catch exceptions thrown by lazy block") {
         val ex                          = new Exception("no future for you!")
@@ -34,18 +34,18 @@ object JavaSpec {
       },
       testM("return an `IO` that produces the value from `Future`") {
         val someValue: UIO[Future[Int]] = UIO.effectTotal(CompletableFuture.completedFuture(42))
-        assertM(ZIO.fromFutureJava(someValue).run, succeeds(equalTo(42)))
+        assertM(ZIO.fromFutureJava(someValue), equalTo(42))
       },
       testM("handle null produced by the completed `Future`") {
         val someValue: UIO[Future[String]] = UIO.effectTotal(CompletableFuture.completedFuture[String](null))
-        assertM(ZIO.fromFutureJava(someValue).run, succeeds(equalTo[String](null)))
+        assertM(ZIO.fromFutureJava(someValue), equalTo[String](null))
       }
     ),
     suite("`Task.fromCompletionStage` must")(
       testM("be lazy on the `Future` parameter") {
         var evaluated                 = false
         def cs: CompletionStage[Unit] = CompletableFuture.supplyAsync(() => evaluated = true)
-        assertM(ZIO.fromCompletionStage(UIO.effectTotal(cs)).as(evaluated).run, succeeds(isFalse))
+        assertM(ZIO.fromCompletionStage(UIO.effectTotal(cs)).when(false).as(evaluated), isFalse)
       },
       testM("catch exceptions thrown by lazy block") {
         val ex                                   = new Exception("no future for you!")
@@ -64,12 +64,12 @@ object JavaSpec {
       },
       testM("return an `IO` that produces the value from `Future`") {
         val someValue: UIO[CompletionStage[Int]] = UIO.effectTotal(CompletableFuture.completedFuture(42))
-        assertM(ZIO.fromCompletionStage(someValue).run, succeeds(equalTo(42)))
+        assertM(ZIO.fromCompletionStage(someValue), equalTo(42))
       },
       testM("handle null produced by the completed `Future`") {
         val someValue: UIO[CompletionStage[String]] =
           UIO.effectTotal(CompletableFuture.completedFuture[String](null))
-        assertM(ZIO.fromCompletionStage(someValue).run, succeeds(equalTo[String](null)))
+        assertM(ZIO.fromCompletionStage(someValue), equalTo[String](null))
       }
     ),
     suite("`Task.toCompletableFuture` must")(
@@ -184,6 +184,7 @@ object JavaSpec {
           fiberClient  <- taskClient.fork
           resultServer <- fiberServer.join
           resultClient <- fiberClient.join
+          _            <- ZIO.effectTotal(server.close())
         } yield (resultServer, resultClient)
 
         assertM(task.run, succeeds[(Integer, (Integer, List[Byte]))](equalTo((1, (1, list)))))
