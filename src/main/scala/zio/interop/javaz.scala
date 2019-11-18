@@ -17,11 +17,11 @@
 package zio.interop
 
 import _root_.java.nio.channels.CompletionHandler
-import _root_.java.util.concurrent.{CompletableFuture, CompletionException, CompletionStage, Future}
+import _root_.java.util.concurrent.{ CompletableFuture, CompletionException, CompletionStage, Future }
 
 import zio.Fiber.Status
 import zio._
-import zio.blocking.{Blocking, blocking}
+import zio.blocking.{ blocking, Blocking }
 
 import scala.concurrent.ExecutionException
 
@@ -139,7 +139,7 @@ object javaz {
               UIO.succeed(None)
             }
           }
-        
+
         final def children: UIO[Iterable[Fiber[Any, Any]]] = UIO(Nil)
 
         final def getRef[A](ref: FiberRef[A]): UIO[A] = UIO(ref.initial)
@@ -149,7 +149,7 @@ object javaz {
         final def interruptAs(id: Fiber.Id): UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
 
         final def inheritRefs: UIO[Unit] = IO.unit
-        
+
         final def status: UIO[Fiber.Status] = UIO {
           // TODO: Avoid toCompletableFuture?
           if (thunk.toCompletableFuture.isDone) Status.Done else Status.Running
@@ -190,7 +190,7 @@ object javaz {
         def interruptAs(id: Fiber.Id): UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
 
         def inheritRefs: UIO[Unit] = UIO.unit
-        
+
         def status: UIO[Fiber.Status] = UIO {
           if (thunk.isDone) Status.Done else Status.Running
         }
