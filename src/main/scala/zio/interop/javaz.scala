@@ -26,12 +26,10 @@ import zio.blocking.{ blocking, Blocking }
 import scala.concurrent.ExecutionException
 
 object javaz {
-
   def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
     Task.effectSuspendTotalWith { p =>
       Task.effectAsync { k =>
         val handler = new CompletionHandler[T, Any] {
-
           def completed(result: T, u: Any): Unit = k(Task.succeed(result))
 
           def failed(t: Throwable, u: Any): Unit = t match {
@@ -100,13 +98,11 @@ object javaz {
   }
 
   implicit class FutureJavaconcurrentOps[A](private val futureUio: UIO[Future[A]]) extends AnyVal {
-
     /** WARNING: this uses the blocking Future#get, consider using `CompletionStage` */
     def toZio: RIO[Blocking, A] = ZIO.fromFutureJava(futureUio)
   }
 
   implicit class ZioObjJavaconcurrentOps(private val zioObj: ZIO.type) extends AnyVal {
-
     def withCompletionHandler[T](op: CompletionHandler[T, Any] => Unit): Task[T] =
       javaz.withCompletionHandler(op)
 
@@ -114,17 +110,13 @@ object javaz {
 
     /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
     def fromFutureJava[A](futureUio: UIO[Future[A]]): RIO[Blocking, A] = javaz.fromFutureJava(futureUio)
-
   }
 
   implicit class FiberObjOps(private val fiberObj: Fiber.type) extends AnyVal {
-
     def fromCompletionStage[A](thunk: => CompletionStage[A]): Fiber[Throwable, A] = {
-
       lazy val cs: CompletionStage[A] = thunk
 
       new Fiber[Throwable, A] {
-
         override def await: UIO[Exit[Throwable, A]] = ZIO.fromCompletionStage(UIO.effectTotal(cs)).run
 
         override def poll: UIO[Option[Exit[Throwable, A]]] =
@@ -161,11 +153,9 @@ object javaz {
 
     /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
     def fromFutureJava[A](thunk: => Future[A]): Fiber[Throwable, A] = {
-
       lazy val ftr: Future[A] = thunk
 
       new Fiber[Throwable, A] {
-
         def await: UIO[Exit[Throwable, A]] =
           ZIO.fromFutureJava(UIO.effectTotal(ftr)).provide(Blocking.Live).run
 
@@ -220,5 +210,4 @@ object javaz {
     def toCompletableFutureWith(f: E => Throwable): UIO[CompletableFuture[A]] =
       io.mapError(f).toCompletableFuture
   }
-
 }
