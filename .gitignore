@@ -1,5 +1,6 @@
 .bloop
 .metals
+.idea
 .sbtopts
 project/.sbt
 project/travis-deploy-key

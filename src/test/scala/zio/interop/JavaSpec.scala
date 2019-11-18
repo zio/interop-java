@@ -20,7 +20,7 @@ object JavaSpec {
       testM("catch exceptions thrown by lazy block") {
         val ex                          = new Exception("no future for you!")
         val noFuture: UIO[Future[Unit]] = UIO.effectTotal(throw ex)
-        assertM(ZIO.fromFutureJava(noFuture).run, equalTo[Exit[Throwable, Unit]](Exit.die(ex)))
+        assertM(ZIO.fromFutureJava(noFuture).run, dies(equalTo(ex)))
       },
       testM("return an `IO` that fails if `Future` fails (failedFuture)") {
         val ex                         = new Exception("no value for you!")
@@ -38,7 +38,7 @@ object JavaSpec {
       },
       testM("handle null produced by the completed `Future`") {
         val someValue: UIO[Future[String]] = UIO.effectTotal(CompletableFuture.completedFuture[String](null))
-        assertM(ZIO.fromFutureJava(someValue), equalTo[String](null))
+        assertM(ZIO.fromFutureJava(someValue).map(Option(_)), isNone)
       }
     ),
     suite("`Task.fromCompletionStage` must")(
@@ -50,7 +50,7 @@ object JavaSpec {
       testM("catch exceptions thrown by lazy block") {
         val ex                                   = new Exception("no future for you!")
         val noFuture: UIO[CompletionStage[Unit]] = UIO.effectTotal(throw ex)
-        assertM(ZIO.fromCompletionStage(noFuture).run, equalTo[Exit[Throwable, Unit]](Exit.die(ex)))
+        assertM(ZIO.fromCompletionStage(noFuture).run, dies(equalTo(ex)))
       },
       testM("return an `IO` that fails if `Future` fails (failedFuture)") {
         val ex                                  = new Exception("no value for you!")
@@ -67,9 +67,8 @@ object JavaSpec {
         assertM(ZIO.fromCompletionStage(someValue), equalTo(42))
       },
       testM("handle null produced by the completed `Future`") {
-        val someValue: UIO[CompletionStage[String]] =
-          UIO.effectTotal(CompletableFuture.completedFuture[String](null))
-        assertM(ZIO.fromCompletionStage(someValue), equalTo[String](null))
+        val someValue: UIO[CompletionStage[String]] = UIO.effectTotal(CompletableFuture.completedFuture[String](null))
+        assertM(ZIO.fromCompletionStage(someValue).map(Option(_)), isNone)
       }
     ),
     suite("`Task.toCompletableFuture` must")(
@@ -117,7 +116,7 @@ object JavaSpec {
       testM("catch exceptions thrown by lazy block") {
         val ex                              = new Exception("no future for you!")
         def noFuture: CompletionStage[Unit] = throw ex
-        assertM(Fiber.fromCompletionStage(noFuture).join.run, equalTo[Exit[Throwable, Unit]](Exit.die(ex)))
+        assertM(Fiber.fromCompletionStage(noFuture).join.run, dies(equalTo(ex)))
       },
       testM("return an `IO` that fails if `Future` fails (failedFuture)") {
         val ex                             = new Exception("no value for you!")
@@ -144,7 +143,7 @@ object JavaSpec {
       testM("catch exceptions thrown by lazy block") {
         val ex                     = new Exception("no future for you!")
         def noFuture: Future[Unit] = throw ex
-        assertM(Fiber.fromFutureJava(noFuture).join.run, equalTo[Exit[Throwable, Unit]](Exit.die(ex)))
+        assertM(Fiber.fromFutureJava(noFuture).join.run, dies(equalTo(ex)))
       },
       testM("return an `IO` that fails if `Future` fails (failedFuture)") {
         val ex                    = new Exception("no value for you!")

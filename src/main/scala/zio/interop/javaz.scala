@@ -19,6 +19,7 @@ package zio.interop
 import _root_.java.nio.channels.CompletionHandler
 import _root_.java.util.concurrent.{ CompletableFuture, CompletionException, CompletionStage, Future }
 
+import zio.Fiber.Status
 import zio._
 import zio.blocking.{ blocking, Blocking }
 
@@ -120,7 +121,7 @@ object javaz {
 
     def fromCompletionStage[A](thunk: => CompletionStage[A]): Fiber[Throwable, A] = {
 
-      lazy val cs = thunk
+      lazy val cs: CompletionStage[A] = thunk
 
       new Fiber[Throwable, A] {
 
@@ -139,16 +140,29 @@ object javaz {
             }
           }
 
-        override def interrupt: UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
+        final def children: UIO[Iterable[Fiber[Any, Any]]] = UIO(Nil)
 
-        override def inheritFiberRefs: UIO[Unit] = UIO.unit
+        final def getRef[A](ref: FiberRef[A]): UIO[A] = UIO(ref.initial)
+
+        final def id: UIO[Option[Fiber.Id]] = UIO.none
+
+        final def interruptAs(id: Fiber.Id): UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
+
+        final def inheritRefs: UIO[Unit] = IO.unit
+
+        final def status: UIO[Fiber.Status] = UIO {
+          // TODO: Avoid toCompletableFuture?
+          if (thunk.toCompletableFuture.isDone) Status.Done else Status.Running
+        }
+
+        final def trace: UIO[Option[ZTrace]] = UIO.none
       }
     }
 
     /** WARNING: this uses the blocking Future#get, consider using `fromCompletionStage` */
     def fromFutureJava[A](thunk: => Future[A]): Fiber[Throwable, A] = {
 
-      lazy val ftr = thunk
+      lazy val ftr: Future[A] = thunk
 
       new Fiber[Throwable, A] {
 
@@ -167,10 +181,21 @@ object javaz {
             }
           }
 
-        def interrupt: UIO[Exit[Throwable, A]] =
-          join.fold(Exit.fail, Exit.succeed)
+        def children: UIO[Iterable[Fiber[Any, Any]]] = UIO(Nil)
 
-        def inheritFiberRefs: UIO[Unit] = UIO.unit
+        def getRef[A](ref: FiberRef[A]): UIO[A] = UIO(ref.initial)
+
+        def id: UIO[Option[Fiber.Id]] = UIO.none
+
+        def interruptAs(id: Fiber.Id): UIO[Exit[Throwable, A]] = join.fold(Exit.fail, Exit.succeed)
+
+        def inheritRefs: UIO[Unit] = UIO.unit
+
+        def status: UIO[Fiber.Status] = UIO {
+          if (thunk.isDone) Status.Done else Status.Running
+        }
+
+        def trace: UIO[Option[ZTrace]] = UIO.none
       }
     }
   }
