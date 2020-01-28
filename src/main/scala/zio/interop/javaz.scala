@@ -98,6 +98,7 @@ object javaz {
   }
 
   implicit class FutureJavaconcurrentOps[A](private val futureUio: UIO[Future[A]]) extends AnyVal {
+
     /** WARNING: this uses the blocking Future#get, consider using `CompletionStage` */
     def toZio: RIO[Blocking, A] = ZIO.fromFutureJava(futureUio)
   }
